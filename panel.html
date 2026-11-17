@@ -1,0 +1,60 @@
+<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FuzSuc — Fuzcraft sunucuları</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:#1b1f2a url() ;color:#e8ecf4;min-height:100vh;background-image:linear-gradient(180deg,#232a3b,#12151d)}
+header{text-align:center;padding:34px 12px 10px}h1{margin:0;font-size:46px;letter-spacing:2px;text-shadow:3px 3px 0 #000}h1 b{color:#6fdc4a}.sub{color:#9aa6bd;margin-top:6px}
+main{max-width:760px;margin:0 auto;padding:14px}
+.card{background:#262d3f;border:2px solid #39425a;border-radius:10px;padding:16px;margin-bottom:16px}
+h2{margin:0 0 12px;font-size:18px}label{display:block;font-size:13px;color:#9aa6bd;margin:8px 0 3px}
+input,select{width:100%;padding:10px;border-radius:6px;border:2px solid #3b4560;background:#161a25;color:#fff;font-size:15px}
+.row{display:flex;gap:10px}.row>*{flex:1}
+button{cursor:pointer;border:0;border-radius:6px;padding:10px 14px;font-size:15px;font-weight:600;color:#fff;background:#4a5778}button:hover{filter:brightness(1.12)}
+.go{background:#3f9d2a}.stop{background:#b94a3a}.play{background:#2f7fd1}.big{width:100%;margin-top:12px;font-size:16px;padding:12px}
+.srv{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:12px;border:2px solid #39425a;border-radius:8px;margin-bottom:10px;background:#1e2433}
+.srv .n{font-weight:700;font-size:17px}.srv .i{font-size:13px;color:#9aa6bd}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#777;margin-right:6px}.dot.on{background:#4ade5a;box-shadow:0 0 8px #4ade5a}
+.btns{display:flex;gap:6px;flex-wrap:wrap}.btns button{padding:8px 11px;font-size:14px}
+.empty{color:#9aa6bd;text-align:center;padding:14px}.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#000c;padding:10px 18px;border-radius:8px;display:none}
+code{background:#12151d;padding:2px 6px;border-radius:4px}
+</style></head><body>
+<header><h1>FUZ<b>SUC</b></h1><div class="sub">Fuzcraft için ücretsiz sunucu — oluştur, başlat, arkadaşına link at!</div></header>
+<main>
+<div id="warn" class="card" style="display:none;background:#5a2a2a;border-color:#a44"></div>
+<div class="card"><h2>Oyuncu adın</h2><input id="pname" maxlength="16" placeholder="Oyunda görünecek adın"></div>
+<div class="card"><h2>➕ Yeni sunucu oluştur</h2>
+ <label>Sunucu adı</label><input id="sname" maxlength="24" placeholder="Fuzcraft Dünyam">
+ <div class="row"><div><label>Oyun modu</label><select id="smode"><option value="survival">Hayatta Kalma</option><option value="creative">Yaratıcı</option></select></div>
+ <div><label>Dünya tohumu (boş = rastgele)</label><input id="sseed" placeholder="isteğe bağlı"></div></div>
+ <button class="go big" id="create">Sunucuyu Oluştur</button></div>
+<div class="card"><h2>🖥️ Sunucularım</h2><div id="list"><div class="empty">Henüz sunucun yok.</div></div>
+ <label>Arkadaşının sunucusuna katıl (kod)</label><div class="row"><input id="jcode" maxlength="6" placeholder="Örn. K7M2QX" style="text-transform:uppercase"><button class="play" id="jbtn" style="flex:0 0 120px">Katıl</button></div></div>
+<div class="card" style="font-size:13px;color:#9aa6bd">Sunucu 10 dakika boş kalırsa kendiliğinden kapanır, dünyan kaydedilir. Tekrar <b>Başlat</b>'a basman yeterli. Sunucuyu sadece sen (bu tarayıcıdan) yönetebilirsin; arkadaşların linkle katılır.</div>
+</main><div class="toast" id="toast"></div>
+<script>
+const $=id=>document.getElementById(id);let mine=[];try{mine=JSON.parse(localStorage.getItem('fs_mine')||'[]')}catch(e){}
+$('pname').value=localStorage.getItem('fz_name')||'';
+const save=()=>localStorage.setItem('fs_mine',JSON.stringify(mine));
+function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2600)}
+async function api(p,body){let r;try{r=await fetch(p,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:undefined)}catch(e){throw new Error('Sunucuya ulaşılamadı. Bu sayfayı server.js çalışırken http://localhost:3000 (ya da Render adresin) üzerinden aç; dosyaya çift tıklayarak açma.')}
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('Hata '+r.status+(r.status===404?' — panel.html/server.js eski sürüm olabilir, 5 dosyayı da yeniden yükle':'')));return j}
+const link=c=>location.origin+'/game?s='+c;
+function play(c){const n=$('pname').value.trim();localStorage.setItem('fz_name',n);location.href='/game?s='+c+(n?'&n='+encodeURIComponent(n):'')}
+async function refresh(){
+  const out=[];
+  for(const m of mine){try{out.push({...m,...await api('/api/s/'+m.code)})}catch(e){if(/bulunamadı/.test(e.message)){m.gone=true}else{out.push({...m,err:true});if(!refresh.w){refresh.w=1;toast(e.message)}}}}
+  const n=mine.length;mine=mine.filter(m=>!m.gone);if(mine.length!==n)save();
+  const L=$('list');if(!out.length){L.innerHTML='<div class="empty">Henüz sunucun yok.</div>';return}
+  L.innerHTML='';for(const s of out){const d=document.createElement('div');d.className='srv';
+    d.innerHTML=`<div><div class="n"><span class="dot ${s.online?'on':''}"></span>${esc(s.name||s.code)}</div><div class="i">Kod: <code>${s.code}</code> · ${s.online?s.players+'/'+s.max+' oyuncu · AÇIK':'KAPALI'} · ${s.mode==='creative'?'Yaratıcı':'Hayatta Kalma'}</div></div><div class="btns"></div>`;
+    const b=d.querySelector('.btns');const add=(t,c,f)=>{const x=document.createElement('button');x.textContent=t;if(c)x.className=c;x.onclick=f;b.appendChild(x)};
+    if(s.online){add('▶ Oyna','play',()=>play(s.code));add('🔗 Link kopyala','',()=>copy(link(s.code)));add('■ Durdur','stop',()=>act(s,'stop'))}
+    else add('▶ Başlat','go',()=>act(s,'start'));
+    add('🗑','',()=>{if(confirm('"'+s.name+'" sunucusu ve dünyası silinsin mi?'))act(s,'delete')});
+    L.appendChild(d)}
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function act(s,a){try{await api('/api/s/'+s.code+'/'+a,{token:s.token});if(a==='delete'){mine=mine.filter(m=>m.code!==s.code);save()}else if(a==='start')toast('Sunucu açıldı! Linki arkadaşına gönder.');refresh()}catch(e){toast(e.message)}}
+function copy(t){try{navigator.clipboard.writeText(t);toast('Link kopyalandı')}catch(e){prompt('Linki kopyala:',t)}}
+$('create').onclick=async()=>{try{const s=await api('/api/create',{name:$('sname').value,mode:$('smode').value,seed:$('sseed').value});mine.push({code:s.code,token:s.token});save();$('sname').value='';toast('Sunucu oluşturuldu! Başlat\'a bas.');refresh()}catch(e){toast(e.message)}};
+$('jbtn').onclick=()=>{const c=$('jcode').value.trim().toUpperCase();if(c.length===6)play(c);else toast('6 haneli kodu yaz')};
+if(location.protocol==='file:'||!/^https?:$/.test(location.protocol)){const w=$('warn');w.style.display='block';w.innerHTML='⚠️ Bu sayfa dosyadan açılmış. Önce <code>node server.js</code> çalıştır, sonra tarayıcıda <code>http://localhost:3000</code> aç.'}
+refresh();setInterval(refresh,4000);
+</script></body></html>
